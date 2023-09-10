@@ -1,0 +1,74 @@
+Road map:
+    SCAFFOLD with client subsampling
+    Fix minibatch clipping
+    EPISODE implementation with client subsampling
+    EPISODE with memory
+    SNLI
+    Correct initialization of corrections
+--> Simulated running time (exclude time for artifacts of simulation, divide by simulation factor)
+
+
+task notes:
+- When timing each method later, make sure to exclude time taken for communication
+  required only by simulation. For example, when we are simulating many clients, we have
+  to communicate local corrections c_i to all workers. In a real federated learning
+  scenario, c_i does not need to be communicated except to the server. Also, our
+  wall-clock cost has an additional factor of clients_per_worker due to simulation,
+  which we should eliminate for evaluation.
+- Performance of original EPISODE (after modifying it to support client subsampling) is
+  now worse than fedavg? Not sure if this is a bug but probably not worth the time to
+  investigate at the moment. Edit: We were missing a call to .zero_grad() between
+  computing the local correction for each worker. Haven't tested whether this fixed the
+  problem.
+
+
+========================================================================================
+
+                                        scratch
+
+SNLI experiments:
+- Algorithms: FedAvg, CELGC, SCAFFOLD, Minibatch, Episode++
+- Total clients: 32
+- Participating clients: 8, 16, 24, 32
+- Rounds: 5375
+- Interval: 4
+- Heterogeneity: 0.7
+- Learning rate: 0.1
+- Gamma: 0.1
+
+Previous experiments: 25 epochs, 440000 train set size, 64 batch size, 21500 total steps, 5375 rounds @ interval=4
+
+Other variations:
+- Architecture
+- ?
+
+14_SNLI_I8_S8_N32
+- Grid search over eta = {0.1, 0.3, 1.0} and gamma/eta = {0.1, 0.3, 1.0}
+- fedavg, local_clip, scaffold, episode_mem
+- For high enough step size, all algorithms besides local_clip diverged
+- scaffold diverged with eta >= 0.3
+- episode_mem diverged with (eta >= 0.3 and gamma/eta >= 0.3) or eta >= 1.0, slightly
+  more robust to large step size than scaffold
+- fedavg diverged with eta >= 1.0
+- interesting that for some settings, scaffold diverges while fedavg does not. this
+  suggests another "source" of divergence (besides not clipping): using a very stale
+  correction.
+- In order of robustness to large step size (most robust first): local_clip, fedavg,
+  episode_mem, scaffold
+- This is a different order than the previous paper. There fedavg diverged before
+  episode, though the original episode used more recent corrections. This has the
+  unfortunate implication that, in order to get good results from episode, we should use
+  a small enough learning rate that fedavg is able to converge
+- Next task: compare fedavg performance against the old episode repo and make sure there
+  aren't any bugs that are somehow allowing convergence. also retry experiments with
+  much smaller learning rate
+Fedavg also converges with learning rate = 0.1 in the old implementation? I thought that
+it diverged, that was the whole point of using clipping.
+
+Divergence experiments:
+- eta: 0.1, 0.01, 0.001
+- architecture: lstm, rnn
+- encoder depth: 1, 2, 3
+- heterogeneity: 0.0, 0.7
+- batch size: 32, 64
+- weight decay?
